@@ -92,10 +92,18 @@ module.exports = {
 
 		embed.addFields({ name: '>   Personnel :', value: value });
 
+		value = '';
+		if (memberData?.currencys) {
+			for (const [currencyKey, currencyValue] of Object.entries(memberData.currencys)) {
+				value += `•  ${applicationEmoji(interaction.client, `${currencyKey}`)} **${currencyKey.toUpperCase()}** ${digitToEmoji(interaction.client, currencyValue)}\n`;
+			}
+			if (value) embed.addFields({ name: '>   Portefeuille :', value });
+		}
+
 		let name = '';
 		value = '';
 		if (memberData?.experience && memberData.experience.needed && memberData.experience.acquired) {
-			name += `>   Experience :  **NIVEAU ${memberData.experience.level}**`;
+			name += `>   Experience :  **NIVEAU** ${memberData.experience.level}`;
 			value += `•  ${applicationEmoji(interaction.client, 'xp')} ${getBar(interaction.client, memberData.experience.acquired, memberData.experience.needed)}`;
 		}
 		if (name && value) embed.addFields({ name, value });

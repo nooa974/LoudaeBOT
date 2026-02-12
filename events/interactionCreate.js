@@ -30,9 +30,9 @@ module.exports = {
 					if (!memberData || !memberData.activity || memberData.activity.status !== 'waiting') {
 						return interaction.reply({ content: 'L\'utilisateur n\'est plus en attente d\'une proposition pour le moment !', ephemeral: true });
 					}
-					// if (interaction.user.id === memberId) {
-					// 	return interaction.reply({ content: `Vous ne pouvez pas proposer une ${choix} à vous-même !`, ephemeral: true });
-					// }
+					if (interaction.user.id === memberId) {
+						return interaction.reply({ content: `Vous ne pouvez pas proposer une ${choix} à vous-même !`, ephemeral: true });
+					}
 					const modal = new ModalBuilder().setCustomId(`modal.truthordare.suggestion-${memberId}`).setTitle('Proposer une ' + (choix === 'truth' ? 'vérité' : 'action'));
 					const propositionInput = new TextInputBuilder()
 						.setCustomId('propositionInput')
