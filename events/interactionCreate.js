@@ -1,7 +1,6 @@
 const { Events, Collection, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, UserSelectMenuBuilder } = require('discord.js');
 const { load } = require('../utils/db');
-const { getGuildDb } = require('../utils/mongodb.js');
-const memberSchema = require('../models/Member.js');
+const mongoDb = require('../utils/mongodb');
 const { applicationEmoji } = require('../functions/applicationEmoji.js');
 
 const profile = {
@@ -19,13 +18,6 @@ const profileNames = {
 module.exports = {
 	name: Events.InteractionCreate,
 	async execute(interaction) {
-		let guildDB = interaction.guild != null ? getGuildDb(interaction.guild.id).model('Member', memberSchema) : null;
-		let memberData = await guildDB?.findOne({ memberId: interaction.user.id }) || null;
-		if (guildDB && !memberData) {
-			memberData = new guildDB({ memberId: interaction.user.id });
-			await memberData.save();
-		}
-
 		const customId = interaction.customId ? interaction.customId.split('.') : null;
 		const type = customId ? customId[0] : null;
 		const activity = customId ? customId[1] : null;
@@ -34,39 +26,20 @@ module.exports = {
 		if (type === 'button') {
 			if (activity === 'truthordare') {
 				if (option === 'truth' || option === 'dare') {
-					const choix = option === 'truth' ? 'vérité' : 'action';
-
+					const memberData = await mongoDb.create(interaction.guild.id, 'Member', interaction.user.id, { memberName: interaction.user.tag });
 					if (memberData[activity]) {
 						return interaction.reply({ content: 'Vous ne pouvez pas jouer à action ou vérité plus d\'une fois en même temps !', ephemeral: true });
 					}
-					const embed = new EmbedBuilder()
-						.setTitle(`ACTION ${applicationEmoji(interaction.client, 'dare')} __OU__ VÉRITÉ ${applicationEmoji(interaction.client, 'truth')}`)
-						// .addFields({ name: '\u200B', value: `${applicationEmoji(interaction.client, 'certified')} ${interaction.user} a choisi une **${choix.toUpperCase()}** ${option === 'truth' ? applicationEmoji(interaction.client, 'truth') : applicationEmoji(interaction.client, 'dare')}` })
-						.addFields({ name: '\u200B', value: `${applicationEmoji(interaction.client, 'suggestion')} ${interaction.user}\n> \`RECHERCHE\` Une proposition ${option === 'truth' ? `de **vérité** à avouer ${applicationEmoji(interaction.client, 'truth')}` : `d'**action** à relever ${applicationEmoji(interaction.client, 'dare')}`}` })
-						.setColor(option === 'truth' ? '#FD4342' : '#E1E8EE');
-					const messageButtons = new ActionRowBuilder()
-						.addComponents(new ButtonBuilder().setCustomId(`button.truthordare.suggestion-${interaction.user.id}-${option}`).setLabel(`FAIRE UNE SUGGESTION ${option === 'truth' ? 'DE VÉRITÉ' : 'D\'ACTION'}`).setStyle(ButtonStyle.Primary));
+					const embed = new EmbedBuilder().setTitle(`ACTION ${applicationEmoji(interaction.client, 'dare')} __OU__ VÉRITÉ ${applicationEmoji(interaction.client, 'truth')}`).addFields({ name: '\u200B', value: `${applicationEmoji(interaction.client, 'suggestion')} ${interaction.user}\n> \`RECHERCHE\` Une proposition ${option === 'truth' ? `de **vérité** à avouer ${applicationEmoji(interaction.client, 'truth')}` : `d'**action** à relever ${applicationEmoji(interaction.client, 'dare')}`}` }).setColor(option === 'truth' ? '#FD4342' : '#E1E8EE');
+					const messageButtons = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`button.truthordare.suggestion-${interaction.user.id}-${option}`).setLabel(`FAIRE UNE SUGGESTION ${option === 'truth' ? 'DE VÉRITÉ' : 'D\'ACTION'}`).setStyle(ButtonStyle.Primary));
 					const message = await interaction.reply({ embeds: [embed], components: [messageButtons], fetchReply: true });
-					return await guildDB.updateOne(
-						{ memberId: interaction.user.id },
-						{
-							$set: {
-								[activity]: {
-									status: 'waiting',
-									choice: option,
-									channelId: interaction.channel.id,
-									messageId: message.id,
-								},
-							},
-						},
-						{ upsert: true },
-					);
+					await mongoDb.update(interaction.guild.id, 'Member', interaction.user.id, { activity: { status: 'waiting', choice: option, channelId: interaction.channel.id, messageId: message.id } });
 				}
 				else if (option.startsWith('suggestion-')) {
 					const memberId = option.split('-')[1];
-					memberData = await guildDB.findOne({ memberId: memberId });
+					memberData = await mongoDb.find(interaction.guild.id, 'Member', memberId);
 					const choix = option.split('-')[2];
-					if (memberData.activity || memberData[activity].status !== 'waiting') {
+					if (!memberData || !memberData.activity || memberData.activity.status !== 'waiting') {
 						return interaction.reply({ content: 'L\'utilisateur n\'est plus en attente d\'une proposition pour le moment !', ephemeral: true });
 					}
 					// if (interaction.user.id === memberId) {
@@ -87,11 +60,11 @@ module.exports = {
 				else if (option.startsWith('accept-') || option.startsWith('refuse-')) {
 					const guildId = option.split('-')[1];
 					const memberId = option.split('-')[2];
-					guildDB = getGuildDb(guildId).model('Member', memberSchema);
-					memberData = await guildDB.findOne({ memberId: memberId });
-					const channel = await interaction.client.channels.fetch(memberData[activity].channelId);
+					const memberData = await mongoDb.find(guildId, 'Member', memberId);
+					if (!memberData || !memberData.activity || memberData.activity.status !== 'confirming') return interaction.reply({ content: 'Cette proposition n\'est plus en attente de confirmation !', ephemeral: true });
+					const channel = await interaction.client.channels.fetch(memberData.activity.channelId);
 					console.log(channel);
-					const message = await channel.messages.fetch(memberData[activity].messageId);
+					const message = await channel.messages.fetch(memberData.activity.messageId);
 					console.log(message);
 					const embed = message.embeds[0];
 					console.log(embed.fields);
@@ -99,22 +72,12 @@ module.exports = {
 						embed.fields[embed.fields.length - 1].value = embed.fields[embed.fields.length - 1].value.replace('PROPOSE', 'ACCEPTÉ');
 					}
 					else if (option.startsWith('refuse-')) {
-						return await guildDB.updateOne(
-							{ memberId: memberId },
-							{
-								$set: {
-									'truthordare.status': 'waiting',
-								},
-								$unset: {
-									'truthordare.suggestion': '',
-								},
-							},
-						);
+						await mongoDb.update(guildId, 'Member', memberId, { activity: { status: 'waiting', suggestion: '' } });
 					}
 					await message.edit({ embeds: [embed] });
 				}
 			}
-			else if (activity === 'profile') {
+			/* else if (activity === 'profile') {
 				const modal = new ModalBuilder().setCustomId('modal.profile.modify').setTitle('Modifier votre profil');
 				for (const field of ['gender', 'sexual_orientation', 'love_situation']) {
 					const name = profileNames[field];
@@ -149,14 +112,14 @@ module.exports = {
 				modal.addLabelComponents(labelPartner);
 
 				await interaction.showModal(modal);
-			}
+			} */
 		}
 		else if (type === 'modal') {
 			if (activity === 'truthordare') {
 				if (option.startsWith('suggestion-')) {
 					const memberId = option.split('-')[1];
-					memberData = await guildDB.findOne({ memberId: memberId });
-					if (!memberData || memberData.activity || memberData[activity].status !== 'waiting') {
+					const memberData = await mongoDb.find(interaction.guild.id, 'Member', memberId);
+					if (!memberData || !memberData.activity || memberData.activity.status !== 'waiting') {
 						return interaction.reply({ content: 'L\'utilisateur n\'est plus en attente d\'une proposition pour le moment !', ephemeral: true });
 					}
 					let suggestion = interaction.components[0].component.value.toLowerCase();
@@ -164,13 +127,13 @@ module.exports = {
 					const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 					embed.addFields({ name: '\u200B', value: `${applicationEmoji(interaction.client, 'suggestion')} ${interaction.user}\n> \`PROPOSE\` ${suggestion}` });
 					await interaction.update({ embeds: [embed] });
-					embed.setFields({ name: '\u200B', value: `${interaction.user} vous a suggéré ${memberData[activity].choice === 'truth' ? `une vérité ${applicationEmoji(interaction.client, 'truth')}` : `une action ${applicationEmoji(interaction.client, 'dare')}`} :\n - \`${suggestion}\`` });
+					embed.setFields({ name: '\u200B', value: `${interaction.user} vous a suggéré ${memberData?.[activity]?.choice === 'truth' ? `une vérité ${applicationEmoji(interaction.client, 'truth')}` : `une action ${applicationEmoji(interaction.client, 'dare')}`} :\n - \`${suggestion}\`` });
 					const messageButtons = new ActionRowBuilder()
 						.addComponents(new ButtonBuilder().setCustomId(`button.truthordare.accept-${interaction.guild.id}-${memberId}`).setLabel('ACCEPTER').setStyle(ButtonStyle.Primary))
 						.addComponents(new ButtonBuilder().setCustomId(`button.truthordare.refuse-${interaction.guild.id}-${memberId}`).setLabel('REFUSER').setStyle(ButtonStyle.Danger));
 					const member = await interaction.guild.members.fetch(memberId);
 					await member.send({ embeds: [embed], components: [messageButtons] });
-					return await guildDB.updateOne({ memberId: memberId }, { 'truthordare.status': 'confirming', 'truthordare.suggestion.idea': suggestion, 'truthordare.suggestion.author': interaction.user.id });
+					await mongoDb.update(interaction.guild.id, 'Member', memberId, { activity: { status: 'confirming', suggestion: { idea: suggestion, author: interaction.user.id } } });
 				}
 			}
 			else if (activity === 'profile') {
@@ -178,16 +141,12 @@ module.exports = {
 					const updates = {};
 					interaction.fields.fields.forEach((field) => {
 						const value = field.values[0];
-						if (memberData[field.customId] !== value) {
+						if (memberData?.[field.customId] !== value) {
 							updates[field.customId] = value;
 						}
 					});
 
-					await guildDB.updateOne(
-						{ memberId: interaction.user.id },
-						{ $set: updates },
-						{ new: true, upsert: true },
-					);
+					await mongoDb.update(interaction.guild.id, 'Member', interaction.user.id, updates);
 
 					await interaction.reply({ content: 'Votre profil a été mis à jour avec succès !', ephemeral: true });
 				}

@@ -1,5 +1,6 @@
 function applicationEmoji(client, name) {
-	return name ? client.application.emojis.cache.find(e => e.name === name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()) : ':grey_question:';
+	const emoji = client.application.emojis.cache.find(e => e.name === name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
+	return emoji ? emoji : ':grey_question:';
 };
 
 module.exports = { applicationEmoji };
