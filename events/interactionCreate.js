@@ -3,18 +3,6 @@ const { load } = require('../utils/db');
 const mongoDb = require('../utils/mongodb');
 const { applicationEmoji } = require('../functions/applicationEmoji.js');
 
-const profile = {
-	gender: ['Homme', 'Femme', 'Non-binaire', 'Autre'],
-	sexual_orientation: ['Hétérosexuel', 'Homosexuel', 'Bisexuel', 'Pansexuel', 'Asexuel', 'Autre'],
-	love_situation: ['Célibataire', 'En couple', 'Marié(e)', 'Autre'],
-};
-
-const profileNames = {
-	gender: 'genre',
-	sexual_orientation: 'orientation sexuelle',
-	love_situation: 'situation amoureuse',
-};
-
 module.exports = {
 	name: Events.InteractionCreate,
 	async execute(interaction) {
@@ -77,42 +65,6 @@ module.exports = {
 					await message.edit({ embeds: [embed] });
 				}
 			}
-			/* else if (activity === 'profile') {
-				const modal = new ModalBuilder().setCustomId('modal.profile.modify').setTitle('Modifier votre profil');
-				for (const field of ['gender', 'sexual_orientation', 'love_situation']) {
-					const name = profileNames[field];
-					const selectMenu = new StringSelectMenuBuilder()
-						.setCustomId(field)
-						.setPlaceholder(memberData?.[field] ? memberData?.[field] : `Choisissez votre ${name}`)
-						.addOptions(
-							(field === 'gender' ? profile.gender : field === 'sexual_orientation' ? profile.sexual_orientation : profile.love_situation).map(opt =>
-								new StringSelectMenuOptionBuilder()
-									.setLabel(opt)
-									.setValue(opt),
-							),
-						)
-						.setRequired(false);
-					const label = new LabelBuilder()
-						.setLabel(name.charAt(0).toUpperCase() + name.slice(1) + ' :')
-						.setStringSelectMenuComponent(selectMenu);
-
-					modal.addLabelComponents(label);
-				}
-
-				const selectPartner = new UserSelectMenuBuilder()
-					.setCustomId('partner')
-					.setPlaceholder('Sélectionnez votre partenaire')
-					.addDefaultUsers(memberData?.partner ? [memberData.partner] : [])
-					.setRequired(false);
-
-				const labelPartner = new LabelBuilder()
-					.setLabel('Partenaire :')
-					.setUserSelectMenuComponent(selectPartner);
-
-				modal.addLabelComponents(labelPartner);
-
-				await interaction.showModal(modal);
-			} */
 		}
 		else if (type === 'modal') {
 			if (activity === 'truthordare') {
@@ -134,21 +86,6 @@ module.exports = {
 					const member = await interaction.guild.members.fetch(memberId);
 					await member.send({ embeds: [embed], components: [messageButtons] });
 					await mongoDb.update(interaction.guild.id, 'Member', memberId, { activity: { status: 'confirming', suggestion: { idea: suggestion, author: interaction.user.id } } });
-				}
-			}
-			else if (activity === 'profile') {
-				if (option === 'modify') {
-					const updates = {};
-					interaction.fields.fields.forEach((field) => {
-						const value = field.values[0];
-						if (memberData?.[field.customId] !== value) {
-							updates[field.customId] = value;
-						}
-					});
-
-					await mongoDb.update(interaction.guild.id, 'Member', interaction.user.id, updates);
-
-					await interaction.reply({ content: 'Votre profil a été mis à jour avec succès !', ephemeral: true });
 				}
 			}
 		}

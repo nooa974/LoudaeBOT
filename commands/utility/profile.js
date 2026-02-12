@@ -101,32 +101,13 @@ module.exports = {
 		if (name && value) embed.addFields({ name, value });
 
 		value = '';
-		// let genderEmoji = memberData?.gender ? applicationEmoji(interaction.client, `gender_${memberData.gender}`) : applicationEmoji(interaction.client);
-		// if (memberData?.gender !== 'Homme' && memberData?.gender !== 'Femme') {
-		// 	genderEmoji = applicationEmoji(interaction.client, 'gender_transgendre');
-		// };
-		if (memberData?.gender) value += `•  ${applicationEmoji(interaction.client, `gender_${memberData.gender}`)} ${memberData.gender}\n`;
-		if (memberData?.sexual_orientation) value += `•  ${applicationEmoji(interaction.client, `sexual_orientation_${memberData.sexual_orientation}`)} ${memberData.sexual_orientation}\n`;
+		if (memberData?.badges) {
+			for (const badge of memberData.badges) {
+				value += `•  ${applicationEmoji(interaction.client, `badge_${badge}`)} **\`${badge.toUpperCase()}\`**\n`;
+			}
+			if (value) embed.addFields({ name: '>   Badges :', value });
+		}
 
-		if (value) embed.addFields({ name: '>   Identité :', value: value });
-
-		value = '';
-		if (memberData?.love_situation) value += `•  ${applicationEmoji(interaction.client, `love_situation_${memberData.love_situation}`)} ${memberData.love_situation}\n`;
-		// value += memberData?.love_situation ? `•  ${applicationEmoji(interaction.client, `love_situation_${memberData.love_situation}`)} ${memberData.love_situation}\n` : `•  ${applicationEmoji(interaction.client)} Situation amoureuse indéfinie\n`;
-		// if (memberData?.love_situation !== 'Célibataire') {
-		// 	if (memberData.partner && guild.members.cache.has(memberData.partner)) {
-		// 		value += `•  ${applicationEmoji(interaction.client, 'partner')} ${guild.members.cache.get(memberData.partner)}\n`;
-		// 	}
-		// 	else {
-		// 		value += `•  ${applicationEmoji(interaction.client)} Partenaire indéfini(e)\n`;
-		// 	}
-		// }
-
-		if (value) embed.addFields({ name: '>   Relationnel :', value: value || '\u200B' });
-
-		const profileButton = new ActionRowBuilder()
-			.addComponents(new ButtonBuilder().setCustomId('button.profile.modify').setLabel('Modifier le profil').setStyle(ButtonStyle.Primary));
-
-		return await interaction.editReply({ embeds: [embed], components: [profileButton] });
+		return await interaction.editReply({ embeds: [embed]});
 	},
 };
