@@ -91,7 +91,6 @@ module.exports = {
 		value += `•  ${applicationEmoji(interaction.client, 'member')} ${member}\n`;
 
 		embed.addFields({ name: '>   Personnel :', value: value });
-		console.log('oui');
 
 		let name = '';
 		value = '';

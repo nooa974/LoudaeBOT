@@ -15,7 +15,6 @@ module.exports = {
 			if (message.member.premiumSince || message.member.roles.cache.find(role => role.name.includes('Staff'))) multiplier *= 1.5;
 			if (message.member.presence?.activities?.find(activity => activity.type === 4 && activity.state === 'discord.gg/loudae')) multiplier *= 1.3;
 			if (message.author.primaryGuild?.identityEnabled && message.author.primaryGuild.identityGuildId === message.guildId) multiplier *= 1.2;
-			message.reply(multiplier.toString());
 			xp *= multiplier.toFixed(2);
 			memberData.set('experience.acquired', memberData.experience?.acquired ? (memberData.experience.acquired + xp) : xp);
 			await memberData.save();
